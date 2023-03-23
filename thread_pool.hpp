@@ -3,6 +3,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include <vector>
 #include <thread>
 #include <functional>
 #include <cassert>
@@ -16,7 +17,13 @@ public:
     ~Threadpool();
 
     template <class F>
-    void add_task(F&& task);
+    void add_task(F&& task) {
+        {
+            std::lock_guard<std::mutex> lock(pool_->mtx);
+            pool_->tasks.emplace(std::forward<F>(task));
+        }
+        pool_->cond.notify_one();
+    }
 
 private:
     struct Pool {
@@ -26,6 +33,7 @@ private:
         std::queue<std::function<void()>> tasks; // work queue
     };
     std::shared_ptr<Pool> pool_;
+    std::vector<std::thread> threads_;
 };
 
 #endif // _THREAD_POOL
